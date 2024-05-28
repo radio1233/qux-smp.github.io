@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Voice Recorder</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
+        h1 {
+            color: #333;
+        }
+        #recordButton, #stopButton, #downloadButton, #clearButton {
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            font-size: 16px;
+            margin: 10px;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        #recordButton:hover, #stopButton:hover, #downloadButton:hover, #clearButton:hover {
+            background-color: #45a049;
+        }
+        #stopButton {
+            background-color: #f44336;
+        }
+        #recordingsList {
+            margin-top: 20px;
+        }
+        audio {
+            margin-top: 10px;
+        }
+        #recordingIndicator {
+            color: red;
+            font-size: 20px;
+            margin-top: 10px;
+        }
+        #actions {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Voice Recorder</h1>
+    
+    <button id="recordButton">Start Recording</button>
+    <button id="stopButton" disabled>Stop Recording</button>
+    <button id="downloadButton" disabled>Download Recording</button>
+    <button id="clearButton" disabled>Clear Recordings</button>
+    
+    <div id="recordingsList"></div>
+    <div id="timer">00:00</div>
+    <div id="recordingIndicator"></div>
+    <div id="actions"></div>
+    
+    <script>
+        let mediaRecorder;
+        let chunks = [];
+        let timerInterval;
+        let startTime;
+        const recordButton = document.getElementById('recordButton');
+        const stopButton = document.getElementById('stopButton');
+        const downloadButton = document.getElementById('downloadButton');
+        const clearButton = document.getElementById('clearButton');
+        const recordingsList = document.getElementById('recordingsList');
+        const timerDisplay = document.getElementById('timer');
+        const recordingIndicator = document.getElementById('recordingIndicator');
+        const actions = document.getElementById('actions');
+
+        recordButton.addEventListener('click', startRecording);
+        stopButton.addEventListener('click', stopRecording);
+        downloadButton.addEventListener('click', downloadRecording);
+        clearButton.addEventListener('click', clearRecordings);
+
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                startTime = Date.now();
+
+                mediaRecorder.ondataavailable = function(e) {
+                    chunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = function() {
+                    clearInterval(timerInterval);
+                    const blob = new Blob(chunks, { 'type' : 'audio/ogg; codecs=opus' });
+                    chunks = [];
+                    const audioURL = window.URL.createObjectURL(blob);
+                    const audio = document.createElement('audio');
+                    audio.controls = true;
+                    audio.src = audioURL;
+                    recordingsList.appendChild(audio);
+                    downloadButton.disabled = false;
+                    clearButton.disabled = false;
+                    recordingIndicator.textContent = '';
+                };
+
+                mediaRecorder.start();
+                timerInterval = setInterval(updateTimer, 1000);
+                recordButton.disabled = true;
+                stopButton.disabled = false;
+                clearButton.disabled = true;
+                recordingIndicator.textContent = 'Recording...';
+            } catch (err) {
+                console.error('Error accessing microphone:', err);
+            }
+        }
+
+        function stopRecording() {
+            mediaRecorder.stop();
+            recordButton.disabled = false;
+            stopButton.disabled = true;
+        }
+
+        function downloadRecording() {
+            const blob = new Blob(chunks, { 'type' : 'audio/ogg; codecs=opus' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'recording.ogg';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        function updateTimer() {
+            const elapsedTime = Date.now() - startTime;
+            const seconds = Math.floor(elapsedTime / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            const formattedTime = padZero(minutes) + ":" + padZero(remainingSeconds);
+            timerDisplay.textContent = formattedTime;
+        }
+
+        function padZero(value) {
+            return value < 10 ? '0' + value : value;
+        }
+
+        function clearRecordings() {
+            recordingsList.innerHTML = '';
+            clearButton.disabled = true;
+            downloadButton.disabled = true;
+        }
+    </script>
+</body>
+</html>
