@@ -1,3 +1,8 @@
+# Install the PSWriteHTML module for the current user
+if (-not (Get-Module -ListAvailable -Name PSWriteHTML)) {
+    Install-Module -Name PSWriteHTML -Scope CurrentUser -Force
+}
+
 # Define the path where the screenshot will be saved
 $screenshotPath = "$env:TEMP\screenshot.png"
 
