@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Voice and Video Recorder</title>
+    <title>Voice Recorder</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -11,7 +11,7 @@
         h1 {
             color: #333;
         }
-        #recordAudioButton, #recordVideoButton, #stopButton, #downloadButton, #clearButton, #playButton, #pauseButton {
+        #recordButton, #stopButton, #downloadButton, #clearButton {
             background-color: #4CAF50;
             color: white;
             padding: 15px 32px;
@@ -22,7 +22,7 @@
             cursor: pointer;
             border-radius: 5px;
         }
-        #recordAudioButton:hover, #recordVideoButton:hover, #stopButton:hover, #downloadButton:hover, #clearButton:hover, #playButton:hover, #pauseButton:hover {
+        #recordButton:hover, #stopButton:hover, #downloadButton:hover, #clearButton:hover {
             background-color: #45a049;
         }
         #stopButton {
@@ -31,9 +31,8 @@
         #recordingsList {
             margin-top: 20px;
         }
-        audio, video {
+        audio {
             margin-top: 10px;
-            max-width: 100%;
         }
         #recordingIndicator {
             color: red;
@@ -43,21 +42,12 @@
         #actions {
             margin-top: 20px;
         }
-        .volume-control {
-            margin-top: 10px;
-        }
-        .seek-bar {
-            margin-top: 10px;
-            width: 80%;
-            display: inline-block;
-        }
     </style>
 </head>
 <body>
-    <h1>Voice and Video Recorder</h1>
+    <h1>Voice Recorder</h1>
     
-    <button id="recordAudioButton">Record Audio</button>
-    <button id="recordVideoButton">Record Video</button>
+    <button id="recordButton">Start Recording</button>
     <button id="stopButton" disabled>Stop Recording</button>
     <button id="downloadButton" disabled>Download Recording</button>
     <button id="clearButton" disabled>Clear Recordings</button>
@@ -65,222 +55,77 @@
     <div id="recordingsList"></div>
     <div id="timer">00:00</div>
     <div id="recordingIndicator"></div>
-    <div id="actions">
-        <button id="playButton" disabled>Play</button>
-        <button id="pauseButton" disabled>Pause</button>
-        <input type="range" class="volume-control" id="volumeControl" min="0" max="1" step="0.1" value="1">
-        <div class="seek-bar">
-            <input type="range" id="seekBar" min="0" value="0">
-        </div>
-        <label for="playbackSpeed">Playback Speed:</label>
-        <select id="playbackSpeed">
-            <option value="0.5">0.5x</option>
-            <option value="1" selected>1x</option>
-            <option value="1.5">1.5x</option>
-            <option value="2">2x</option>
-        </select>
-    </div>
+    <div id="actions"></div>
     
     <script>
         let mediaRecorder;
-        let audioChunks = [];
-        let videoChunks = [];
-        let audioPlayer;
-        let videoPlayer;
+        let chunks = [];
         let timerInterval;
         let startTime;
-        let isAudioRecording = false;
-        let isVideoRecording = false;
-        const recordAudioButton = document.getElementById('recordAudioButton');
-        const recordVideoButton = document.getElementById('recordVideoButton');
+        const recordButton = document.getElementById('recordButton');
         const stopButton = document.getElementById('stopButton');
         const downloadButton = document.getElementById('downloadButton');
         const clearButton = document.getElementById('clearButton');
-        const playButton = document.getElementById('playButton');
-        const pauseButton = document.getElementById('pauseButton');
-        const volumeControl = document.getElementById('volumeControl');
-        const seekBar = document.getElementById('seekBar');
-        const playbackSpeed = document.getElementById('playbackSpeed');
         const recordingsList = document.getElementById('recordingsList');
         const timerDisplay = document.getElementById('timer');
         const recordingIndicator = document.getElementById('recordingIndicator');
         const actions = document.getElementById('actions');
 
-        recordAudioButton.addEventListener('click', startAudioRecording);
-        recordVideoButton.addEventListener('click', startVideoRecording);
+        recordButton.addEventListener('click', startRecording);
         stopButton.addEventListener('click', stopRecording);
         downloadButton.addEventListener('click', downloadRecording);
         clearButton.addEventListener('click', clearRecordings);
-        playButton.addEventListener('click', playRecording);
-        pauseButton.addEventListener('click', pauseRecording);
-        volumeControl.addEventListener('input', setVolume);
-        seekBar.addEventListener('input', seekPlayback);
-        playbackSpeed.addEventListener('change', changePlaybackSpeed);
 
-        async function startAudioRecording() {
+        async function startRecording() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 mediaRecorder = new MediaRecorder(stream);
                 startTime = Date.now();
-                isAudioRecording = true;
 
                 mediaRecorder.ondataavailable = function(e) {
-                    audioChunks.push(e.data);
+                    chunks.push(e.data);
                 };
 
                 mediaRecorder.onstop = function() {
-                    isAudioRecording = false;
-                    handleRecordingStop();
+                    clearInterval(timerInterval);
+                    const blob = new Blob(chunks, { 'type' : 'audio/ogg; codecs=opus' });
+                    chunks = [];
+                    const audioURL = window.URL.createObjectURL(blob);
+                    const audio = document.createElement('audio');
+                    audio.controls = true;
+                    audio.src = audioURL;
+                    recordingsList.appendChild(audio);
+                    downloadButton.disabled = false;
+                    clearButton.disabled = false;
+                    recordingIndicator.textContent = '';
                 };
 
-                startRecording();
-                recordingIndicator.textContent = 'Recording Audio...';
-                recordAudioButton.disabled = true;
-                recordVideoButton.disabled = true;
+                mediaRecorder.start();
+                timerInterval = setInterval(updateTimer, 1000);
+                recordButton.disabled = true;
+                stopButton.disabled = false;
+                clearButton.disabled = true;
+                recordingIndicator.textContent = 'Recording...';
             } catch (err) {
                 console.error('Error accessing microphone:', err);
             }
         }
 
-        async function startVideoRecording() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                mediaRecorder = new MediaRecorder(stream);
-                startTime = Date.now();
-                isVideoRecording = true;
-
-                mediaRecorder.ondataavailable = function(e) {
-                    videoChunks.push(e.data);
-                };
-
-                mediaRecorder.onstop = function() {
-                    isVideoRecording = false;
-                    handleRecordingStop();
-                };
-
-                startRecording();
-                recordingIndicator.textContent = 'Recording Video...';
-                recordAudioButton.disabled = true;
-                recordVideoButton.disabled = true;
-            } catch (err) {
-                console.error('Error accessing camera:', err);
-            }
-        }
-
-        function startRecording() {
-            mediaRecorder.start();
-            timerInterval = setInterval(updateTimer, 1000);
-            stopButton.disabled = false;
-        }
-
         function stopRecording() {
             mediaRecorder.stop();
+            recordButton.disabled = false;
             stopButton.disabled = true;
         }
 
-        function handleRecordingStop() {
-            clearInterval(timerInterval);
-            const audioBlob = new Blob(audioChunks, { 'type' : 'audio/ogg; codecs=opus' });
-            const videoBlob = new Blob(videoChunks, { 'type' : 'video/webm' });
-            const audioURL = window.URL.createObjectURL(audioBlob);
-            const videoURL = window.URL.createObjectURL(videoBlob);
-            if (isAudioRecording) {
-                audioPlayer = new Audio(audioURL);
-                audioPlayer.controls = true;
-                recordingsList.appendChild(audioPlayer);
-                downloadButton.disabled = false;
-                clearButton.disabled = false;
-                recordingIndicator.textContent = '';
-                playButton.disabled = false;
-                pauseButton.disabled = false;
-                seekBar.max = audio
-playButton.disabled = false;
-                pauseButton.disabled = false;
-                seekBar.max = audioPlayer.duration;
-                audioPlayer.addEventListener('timeupdate', updateSeekBar);
-            }
-            if (isVideoRecording) {
-                videoPlayer = document.createElement('video');
-                videoPlayer.controls = true;
-                videoPlayer.src = videoURL;
-                recordingsList.appendChild(videoPlayer);
-                downloadButton.disabled = false;
-                clearButton.disabled = false;
-                recordingIndicator.textContent = '';
-                playButton.disabled = false;
-                pauseButton.disabled = false;
-                seekBar.max = videoPlayer.duration;
-                videoPlayer.addEventListener('timeupdate', updateSeekBar);
-            }
-            audioChunks = [];
-            videoChunks = [];
-            recordAudioButton.disabled = false;
-            recordVideoButton.disabled = false;
-        }
-
         function downloadRecording() {
-            const blob = isAudioRecording ? new Blob(audioChunks, { 'type' : 'audio/ogg; codecs=opus' }) :
-                                            new Blob(videoChunks, { 'type' : 'video/webm' });
+            const blob = new Blob(chunks, { 'type' : 'audio/ogg; codecs=opus' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = isAudioRecording ? 'audio_recording.ogg' : 'video_recording.webm';
+            a.download = 'recording.ogg';
             document.body.appendChild(a);
             a.click();
             window.URL.revokeObjectURL(url);
-        }
-
-        function playRecording() {
-            if (isAudioRecording) {
-                audioPlayer.play();
-            }
-            if (isVideoRecording) {
-                videoPlayer.play();
-            }
-        }
-
-        function pauseRecording() {
-            if (isAudioRecording) {
-                audioPlayer.pause();
-            }
-            if (isVideoRecording) {
-                videoPlayer.pause();
-            }
-        }
-
-        function setVolume() {
-            const volume = volumeControl.value;
-            if (isAudioRecording) {
-                audioPlayer.volume = volume;
-            }
-            if (isVideoRecording) {
-                videoPlayer.volume = volume;
-            }
-        }
-
-        function seekPlayback() {
-            const seekTime = seekBar.value;
-            if (isAudioRecording) {
-                audioPlayer.currentTime = seekTime;
-            }
-            if (isVideoRecording) {
-                videoPlayer.currentTime = seekTime;
-            }
-        }
-
-        function updateSeekBar() {
-            const currentTime = isAudioRecording ? audioPlayer.currentTime : videoPlayer.currentTime;
-            seekBar.value = currentTime;
-        }
-
-        function changePlaybackSpeed() {
-            const speed = playbackSpeed.value;
-            if (isAudioRecording) {
-                audioPlayer.playbackRate = speed;
-            }
-            if (isVideoRecording) {
-                videoPlayer.playbackRate = speed;
-            }
         }
 
         function updateTimer() {
