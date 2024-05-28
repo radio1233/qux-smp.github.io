@@ -1,0 +1,16 @@
+# send-ip.ps1
+param(
+    [string]$webhookUrl
+)
+
+# Fetch the public IP address
+$ip = (Invoke-RestMethod -Uri "https://api.ipify.org?format=json").ip
+
+# Prepare the JSON payload
+$jsonPayload = @{
+    username = "IP Logger"
+    content  = "User IP Address: $ip"
+} | ConvertTo-Json
+
+# Send the IP address to the Discord webhook
+Invoke-RestMethod -Uri $webhookUrl -Method Post -ContentType 'application/json' -Body $jsonPayload
